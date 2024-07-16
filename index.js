@@ -5,6 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 const app = express();
 require("dotenv").config();
+const bcrypt = require("bcrypt");
 
 const corsOptions = {
   origin: ["http://localhost:5173", "http://localhost:5174"],
@@ -33,6 +34,26 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    // collections
+    const usersCollection = client.db("mfsDB").collection("users");
+
+    // apis
+    app.post("/register", async (req, res) => {
+      const saltRounds = 10;
+      let userData = req.body;
+      const { email, pin } = userData;
+      // check if user exists
+      const user = await usersCollection.findOne({ email });
+      if (user) {
+        return res.status(400).send({ message: "User already exists" });
+      }
+      const hash = bcrypt.hashSync(pin, saltRounds);
+      userData.pin = hash;
+      // create user
+      const newUser = await usersCollection.insertOne(userData);
+      res.send(newUser);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
