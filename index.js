@@ -39,6 +39,8 @@ async function run() {
     const usersCollection = client.db("mfsDB").collection("users");
 
     // apis
+
+    // register user
     app.post("/register", async (req, res) => {
       const saltRounds = 10;
       let userData = req.body;
@@ -53,6 +55,27 @@ async function run() {
       // create user
       const newUser = await usersCollection.insertOne(userData);
       res.send(newUser);
+    });
+
+    // login user
+    app.post("/login", async (req, res) => {
+      const { id, pin } = req.body;
+      const user = await usersCollection.findOne({
+        $or: [{ email: id }, { number: id }],
+      });
+      if (!user) {
+        return res.status(400).send({ message: "User not found" });
+      }
+      const match = bcrypt.compareSync(pin, user.pin);
+      if (!match) {
+        return res.status(400).send({ message: "Invalid credentials" });
+      }
+      //   const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+      //     expiresIn: "1h",
+      //   });
+      //   res.send({ token });
+
+      res.send({ message: "Login successful" });
     });
 
     // Send a ping to confirm a successful connection
