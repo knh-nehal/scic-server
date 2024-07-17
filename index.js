@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { MongoClient, ServerApiVersion } = require("mongodb");
 const port = process.env.PORT || 5000;
 const app = express();
 require("dotenv").config();
@@ -38,7 +38,22 @@ async function run() {
     // collections
     const usersCollection = client.db("mfsDB").collection("users");
 
-    // apis
+    // Verify JWT token
+    const verifyToken = (req, res, next) => {
+      const token = req.headers.authorization;
+      if (!token) {
+        return res.status(401).send({ message: "Access Denied" });
+      }
+      jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(403).send({ message: "Authorization Denied" });
+        }
+        req.user = decoded;
+        next();
+      });
+    };
+
+    // APIs
 
     // register user
     app.post("/register", async (req, res) => {
@@ -59,7 +74,7 @@ async function run() {
 
     // login user
     app.post("/login", async (req, res) => {
-      const { id, pin } = req.body;
+      const { id, pin } = await req.body;
       const user = await usersCollection.findOne({
         $or: [{ email: id }, { number: id }],
       });
@@ -70,12 +85,26 @@ async function run() {
       if (!match) {
         return res.status(400).send({ message: "Invalid credentials" });
       }
-      //   const token = jwt.sign({ email }, process.env.JWT_SECRET, {
-      //     expiresIn: "1h",
-      //   });
-      //   res.send({ token });
+      const token = jwt.sign(
+        {
+          id,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "365d",
+        }
+      );
+      res.send({ token, user });
+    });
 
-      res.send({ message: "Login successful" });
+    // get user
+    app.get("/userInfo", verifyToken, async (req, res) => {
+      const userId = await req.user;
+      //   console.log(userId);
+      const user = await usersCollection.findOne({
+        $or: [{ email: userId.id }, { number: userId.id }],
+      });
+      res.send(user);
     });
 
     // Send a ping to confirm a successful connection
